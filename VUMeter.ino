@@ -1,7 +1,7 @@
 #define FASTLED_INTERNAL  // Reduce compiletime warnings with FastLED 3.5 or above.
 #include <FastLED.h>
 
-#define ADC_PIN A0
+#define ADC_PIN A0 // Valid range is 10bits, i.e. 0-1023
 #define NUM_PIXELS 14
 #define LED_PIN D2
 #define BRIGHTNESS 96  // Valid range 0-255
@@ -17,7 +17,7 @@ unsigned int minValue = 1023;
 unsigned int maxValue = 0;
 unsigned int ptpMin = 1023;  // Adjust for reasonable initial minimum value to reduce noisy VU Meter at initialisation time.
 unsigned int ptpMax = 0;     // Adjust for reasonable initial max value to reduce noisy VU Meter at initialisation time.
-unsigned int sample;        // Sample variable from the ADC0 pin.
+unsigned int sample;
 unsigned int samplesNum = 20;  // define initial count of samples, should be enough to capture several peaks and troughs in the wave form from ADC pin after which the samplesNum value is adjusted to achieve CYCLERATE.
 
 int peakCount = 0;
@@ -25,8 +25,8 @@ int peakCount = 0;
 unsigned long peakHoldStartTime = 0;
 unsigned long peakDecrementIntervalStartTime = 0;
 
-int greenTopLED = round(NUM_PIXELS * 0.7);
-int yellowTopLED = NUM_PIXELS - 1;
+const int greenTopLED = round(NUM_PIXELS * 0.7);
+const int yellowTopLED = NUM_PIXELS - 1;
 
 void setup() {
   Serial.begin(115200);
@@ -36,7 +36,7 @@ void setup() {
 
 void loop() {
   unsigned long startMillis = millis();  // Sample Window Start
-  int i, j;                              //i need for loops
+  unsigned int i, j;                              //i and j need for loops
 
 
 
@@ -51,7 +51,7 @@ void loop() {
   }
 
   //Capture the time it takes to finish the samplesNum samples.
-  unsigned long sampleFinishMillis = millis() - startMillis;
+  unsigned long sampleFinishMillis = millis() - startMillis; // used for loop time control.
 
   unsigned int peakToPeak = maxValue - minValue;
   // track ptpMin and ptpMax for the range within with peakToPeak varies as the first range in the map function and to adjust the bounds.
@@ -61,11 +61,10 @@ void loop() {
   }
 
   int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
-  //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Alternative Logarithmic scaling calculation - ~human ear.
+  //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Logarithmic scaling calculation - human ear.
 
-  // in case above calculations exceed NUM_PIXELS, clip.... shouldn't be required. YUK.
-  if (ledsCount > NUM_PIXELS) {
-    ledsCount = NUM_PIXELS; 
+  if (ledsCount > NUM_PIXELS) { // clip any spurious values from ledsCount. YUK.
+    ledsCount = NUM_PIXELS;
   }
 
   // track the peak value of ledsCount
@@ -75,8 +74,8 @@ void loop() {
   }
 
 
-  unsigned long holdTime = millis() - peakHoldStartTime;
-  unsigned long decrementInterval = millis() - peakDecrementIntervalStartTime;  // tracking decrementInterval
+  unsigned long holdTime = millis() - peakHoldStartTime; // tracking for debugging
+  unsigned long decrementInterval = millis() - peakDecrementIntervalStartTime;  // tracking for debugging
   // Move down peakCount LED after counting down decrementInterval to 0
   if (millis() - peakHoldStartTime >= PEAKHOLDPERIOD - PEAKDECREMENTINTERVAL && peakCount > 0) {  // peak hold expired.
     if (millis() - peakDecrementIntervalStartTime >= PEAKDECREMENTINTERVAL) {                     // after interval expires, decrement the peakCount on initial step, peakDecrementIntervalStartTime will be 0. Millis should be less than Interval for first cycle.
@@ -109,7 +108,7 @@ void loop() {
   // Apply colours to the LEDs
   FastLED.show();
 
-  //Calculate cycleTime
+  //Calculate cycleTime for use in cycle time conntrol.
   unsigned long cycleTime = millis() - startMillis;
 
 
@@ -135,6 +134,7 @@ void loop() {
   Serial.print(holdTime);
   Serial.print(", decrementInterval: ");
   Serial.println(decrementInterval);
+
 
 
   // reset min and max value for next cycle
