@@ -1,7 +1,9 @@
 # VUMeter - an Audio Visualiser
-A simple VU meter implementation for Arduino, Espressif MCUs
+A simple VU meter implementation for Arduino, Espressif MCUs.
 
 A simple audio visualizer that maps the audio signals from ADC to LED strip. The number of lit LEDs is based on the amplitude of the audio signal, with a brighter peak indicator on the highest amplitude.
+
+Credit and attribution: ChatGPT (Jan 9-Jan 30 2023 release versions) wrote the original main structure, with manual fine tuning and refactoring. The LED peak meter with hold etc was not able to be produced by ChatGPT, some potential sample code was supplied and then re-written manually to use non-blocking time based checks. 
 
 ## Requirements
 
