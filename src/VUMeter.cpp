@@ -16,7 +16,7 @@
 #define LED_TYPE WS2812B          //LED IC model.
 #define COLOR_ORDER GRB           // LED RGB Order.
 #define CYCLERATE 20              // 20Hz (50ms) target cycle rate.
-#define PEAKHOLDPERIOD 800        // hold Peak indicator x milliseconds before decrementing position.
+#define PEAKHOLDPERIOD 600        // hold Peak indicator x milliseconds before decrementing position.
 #define PEAKDECREMENTINTERVAL 50  // decrease Peak indicator position each x milliseconds, can't be less that 1/CYCLERATE and is aliased (rounding up) to next whole cycle.
 
 CRGB leds[NUM_PIXELS];
@@ -37,7 +37,11 @@ const int greenTopLED = round(NUM_PIXELS * 0.6);  // Define green LED range.
 const int yellowTopLED = NUM_PIXELS - 2;          // Define yellow LED range.
 
 void setup() {
-  Serial.begin(115200);
+  // Set Up Serial Interface for debugging if required.
+  #ifdef ENABLE_SERIAL_OUTPUT
+  Serial.begin(115200); 
+  #endif
+  // init FastLED.
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
 }
@@ -48,7 +52,7 @@ void loop() {
 
 
 
-  // collect data for number of samples samplesNum
+  // collect audio amplitude data for number of samples samplesNum
   for (i = 0; i < samplesNum; i++) {
     sample = analogRead(ADC_PIN);  //sample the ADC pin. MAX9814 has an offset bias of 1.25v.
     if (sample > maxValue) {
@@ -61,32 +65,35 @@ void loop() {
   //Capture the time it takes to finish the samplesNum samples.
   unsigned long sampleFinishMillis = millis() - startMillis;
 
-  unsigned int peakToPeak = maxValue - minValue;
+  unsigned int peakToPeak = maxValue - minValue; // Take the amplitude of sampleedata.
   // track ptpMin and ptpMax for the range within with peakToPeak varies as the first range in the map function and to adjust the bounds.
   if (peakToPeak >= 0 && peakToPeak <= 1023) {
     if (ptpMin > peakToPeak) { ptpMin = peakToPeak - 1; }
     if (ptpMax < peakToPeak) { ptpMax = peakToPeak + 1; }
   }
 
+ // Calculate VU Meter top LED to light on this cycle.
   int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
-  //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Logarithmic scaling calculation - human ear.
+  //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Alternative Logarithmic scaling calculation - human ear.
 
-  if (ledsCount > NUM_PIXELS) {  // clip any spurious values from ledsCount. YUK.
+// clip any spurious values from ledsCount. YUK.
+  if (ledsCount > NUM_PIXELS) {  
     ledsCount = NUM_PIXELS;
   }
 
-  // track the peak value of ledsCount
+  // track the peak value of ledsCount for the peaking indicator.
   if (ledsCount >= peakCount) {
     peakCount = ledsCount;
     peakHoldStartTime = millis();  //start the peak hold timer
   }
 
+  // Calculate some of the variables for Serial debugging if required.
 #ifdef ENABLE_SERIAL_OUTPUT
   unsigned long holdTime = millis() - peakHoldStartTime;
   unsigned long decrementInterval = millis() - peakDecrementIntervalStartTime;  // tracking decrementInterval
 #endif
 
-  // Move down peakCount LED after counting down decrementInterval to 0
+  // Move down peakCount LED after counting down hold decrementInterval to 0
   if (millis() - peakHoldStartTime >= PEAKHOLDPERIOD - PEAKDECREMENTINTERVAL && peakCount > 0) {  // peak hold expired.
     if (millis() - peakDecrementIntervalStartTime >= PEAKDECREMENTINTERVAL) {                     // after interval expires, decrement the peakCount on initial step, peakDecrementIntervalStartTime will be 0. Millis should be less than Interval for first cycle.
       peakCount = peakCount - 1;
@@ -95,6 +102,7 @@ void loop() {
   }
 
 
+  // Apply updates to LEDs
   // Make peak LED Red, turn off all LEDs above it and fade others to black over 2 cycles. YUK!
   for (j = 0; j < NUM_PIXELS; j++) {
     if (j == peakCount - 1) {
@@ -114,14 +122,15 @@ void loop() {
     }
   }
 
-  // Apply colours to the LEDs
+  // Show updates on the LEDs
   FastLED.show();
 
+ 
   //Calculate cycleTime
   unsigned long cycleTime = millis() - startMillis;
 
 
-  // Send debugging information to the serial port. Can me commented out when not required.
+  // Send debugging information to the serial port if required. Can me commented out when not required.
 #ifdef ENABLE_SERIAL_OUTPUT
   Serial.print("peakToPeak: ");
   Serial.print(peakToPeak);
@@ -150,7 +159,7 @@ void loop() {
   minValue = 1023;
   maxValue = 0;
 
-
+  // Cyclerate adjustment
   // adjust number of samples to achieve CYCLERATE.
   if (cycleTime < (1000 / CYCLERATE)) {
     samplesNum++;
