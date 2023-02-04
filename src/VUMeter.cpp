@@ -12,7 +12,7 @@
 #define ADC_PIN A0                // Valid range is 10bits, i.e. 0-1023
 #define NUM_PIXELS 6             // length of addressable LED strip
 #define LED_PIN D3                // LED data pin out.
-#define BRIGHTNESS 96             // Valid range 0-255
+#define BRIGHTNESS 64             // Valid range 0-255
 #define LED_TYPE WS2812B          //LED IC model.
 #define COLOR_ORDER GRB           // LED RGB Order.
 #define CYCLERATE 20              // 20Hz (50ms) target cycle rate.
@@ -93,7 +93,7 @@ void updateLEDs(unsigned int peakCount, unsigned int ledsCount) {
   // Apply updates to LEDs
   for (unsigned int j = 0; j < NUM_PIXELS; j++) {
     if (j == peakCount - 1) {
-      leds[j] = j == 0 && peakCount == 1 ? CRGB(0, 0, 128) : CRGB(128, 0, 0);  // make peak LED red
+      leds[j] = j == 0 && peakCount == 1 ? CRGB(0, 0, 64) : CRGB(64, 0, 0);  // make peak ue if - otherwise LED red
     } else if (j >= peakCount) {
       leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above peak by 128/256ths
     } else if (j < ledsCount) {
