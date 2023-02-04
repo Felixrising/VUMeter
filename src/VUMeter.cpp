@@ -10,8 +10,8 @@
 //#define ENABLE_SERIAL_OUTPUT // Optional Serial Output.
 
 #define ADC_PIN A0                // Valid range is 10bits, i.e. 0-1023
-#define NUM_PIXELS 14             // length of addressable LED strip
-#define LED_PIN D2                // LED data pin out.
+#define NUM_PIXELS 6             // length of addressable LED strip
+#define LED_PIN D3                // LED data pin out.
 #define BRIGHTNESS 96             // Valid range 0-255
 #define LED_TYPE WS2812B          //LED IC model.
 #define COLOR_ORDER GRB           // LED RGB Order.
@@ -28,13 +28,16 @@ unsigned int ptpMax = 0;     // Adjust for reasonable initial max value to reduc
 unsigned int sample;
 unsigned int samplesNum = 20;  // define initial count of samples, should be enough to capture several peaks and troughs in the wave form from ADC pin after which the samplesNum value is adjusted to achieve CYCLERATE.
 
-int peakCount = 0;  // LED Peak indicator position.
+unsigned int peakCount = 0;  // LED Peak indicator position.
 
 unsigned long peakHoldStartTime = 0;
 unsigned long peakDecrementIntervalStartTime = 0;
 
-const int greenTopLED = round(NUM_PIXELS * 0.6);  // Define green LED range.
-const int yellowTopLED = NUM_PIXELS - 2;          // Define yellow LED range.
+const int greenTopLED = round(NUM_PIXELS * 0.5);  // Define green LED range.
+const int yellowTopLED = round(NUM_PIXELS * 0.8);          // Define yellow LED range.
+
+
+
 
 void setup() {
   // Set Up Serial Interface for debugging if required.
@@ -46,14 +49,17 @@ void setup() {
   FastLED.setBrightness(BRIGHTNESS);
 }
 
-void loop() {
-  unsigned long startMillis = millis();  // Loop function start time.
-  unsigned int i, j;                     //i and j needed for loops
 
+// Set up functions
 
+struct peakValues {
+  unsigned int peakToPeak;
+  unsigned int ptpMin;
+  unsigned int ptpMax;
+};
 
-  // collect audio amplitude data for number of samples samplesNum
-  for (i = 0; i < samplesNum; i++) {
+peakValues getGetAmplitudeMinMax(unsigned int samplesNum) {
+  for (unsigned int i = 0; i < samplesNum; i++) {
     sample = analogRead(ADC_PIN);  //sample the ADC pin. MAX9814 has an offset bias of 1.25v.
     if (sample > maxValue) {
       maxValue = sample;  // Save just the MAX level as an upper boundary
@@ -62,24 +68,73 @@ void loop() {
     }
   }
 
+  unsigned int peakToPeak = maxValue - minValue; // Take the amplitude of sample data.
+  // track ptpMin and ptpMax for the range within which peakToPeak varies as the first range in the map function and to adjust the bounds.
+  if (peakToPeak >= 0 && peakToPeak <= 1023) {
+    if (ptpMin > peakToPeak) {
+      ptpMin = peakToPeak - 1;
+    }
+    if (ptpMax < peakToPeak) {
+      ptpMax = peakToPeak + 1;
+    }
+  }
+
+  // reset min and max value for next cycle
+  minValue = 1023;
+  maxValue = 0;
+
+  peakValues values = {peakToPeak, ptpMin, ptpMax};
+  return values;
+}
+
+
+
+void updateLEDs(unsigned int peakCount, unsigned int ledsCount) {
+  // Apply updates to LEDs
+  for (unsigned int j = 0; j < NUM_PIXELS; j++) {
+    if (j == peakCount - 1) {
+      leds[j] = j == 0 && peakCount == 1 ? CRGB(0, 0, 128) : CRGB(128, 0, 0);  // make peak LED red
+    } else if (j >= peakCount) {
+      leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above peak by 128/256ths
+    } else if (j < ledsCount) {
+      if (j < greenTopLED) {
+        leds[j] = CRGB(0, 255, 0);  // make LEDs green
+      } else if (j >= greenTopLED && j < yellowTopLED) {
+        leds[j] = CRGB(255, 255, 0);  // make LEDs yellow
+      } else {
+        leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs below yellow by 64/256ths
+      }
+    } else {
+      leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above ledsCount by 128/256ths
+    }
+  }
+
+  // Show updates on the LEDs
+  FastLED.show();
+}
+
+
+void loop() {  
+  unsigned long startMillis = millis();  // Loop function start time.
+                   //i and j needed for loops
+
+// Sample ADC input and return amplutude (peakToPeak), minim and maximum of sine wave.
+  peakValues values = getGetAmplitudeMinMax(samplesNum);
+  unsigned int peakToPeak = values.peakToPeak; // Amplitude
+  unsigned int ptpMin = values.ptpMin; //minimum of audio sine wave
+  unsigned int ptpMax = values.ptpMax; //maximum of audio sine wave
+
   //Capture the time it takes to finish the samplesNum samples.
   unsigned long sampleFinishMillis = millis() - startMillis;
 
-  unsigned int peakToPeak = maxValue - minValue; // Take the amplitude of sampleedata.
-  // track ptpMin and ptpMax for the range within with peakToPeak varies as the first range in the map function and to adjust the bounds.
-  if (peakToPeak >= 0 && peakToPeak <= 1023) {
-    if (ptpMin > peakToPeak) { ptpMin = peakToPeak - 1; }
-    if (ptpMax < peakToPeak) { ptpMax = peakToPeak + 1; }
-  }
-
  // Calculate VU Meter top LED to light on this cycle.
-  int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
+ unsigned int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
   //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Alternative Logarithmic scaling calculation - human ear.
 
 // clip any spurious values from ledsCount. YUK.
-  if (ledsCount > NUM_PIXELS) {  
-    ledsCount = NUM_PIXELS;
-  }
+//  if (ledsCount > NUM_PIXELS) {  
+//    ledsCount = NUM_PIXELS;
+//  }
 
   // track the peak value of ledsCount for the peaking indicator.
   if (ledsCount >= peakCount) {
@@ -102,32 +157,12 @@ void loop() {
   }
 
 
-  // Apply updates to LEDs
-  // Make peak LED Red, turn off all LEDs above it and fade others to black over 2 cycles. YUK!
-  for (j = 0; j < NUM_PIXELS; j++) {
-    if (j == peakCount - 1) {
-      leds[j] = j == 0 && peakCount == 1 ? CRGB(0, 0, 128) : CRGB(128, 0, 0);  // make peak LED red
-    } else if (j >= peakCount) {
-      leds[j].fadeToBlackBy(196);  // reduce brightness of lit LEDs above peak by 128/256ths
-    } else if (j < ledsCount) {
-      if (j < greenTopLED) {
-        leds[j] = CRGB(0, 255, 0);  // make LEDs green
-      } else if (j >= greenTopLED && j < yellowTopLED) {
-        leds[j] = CRGB(255, 255, 0);  // make LEDs yellow
-      } else {
-        leds[j].fadeToBlackBy(64);  // reduce brightness of lit LEDs below yellow by 64/256ths
-      }
-    } else {
-      leds[j].fadeToBlackBy(196);  // reduce brightness of lit LEDs above ledsCount by 128/256ths
-    }
-  }
-
-  // Show updates on the LEDs
-  FastLED.show();
+// Apply updates to LEDs
+updateLEDs(peakCount, ledsCount);
 
  
-  //Calculate cycleTime
-  unsigned long cycleTime = millis() - startMillis;
+//Calculate cycleTime
+unsigned long cycleTime = millis() - startMillis;
 
 
   // Send debugging information to the serial port if required. Can me commented out when not required.
