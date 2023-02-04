@@ -212,3 +212,5 @@ test
 .pio/libdeps/d1_mini/arduino/arduino.h
 .pio/libdeps/d1_mini/arduino/library.json
 .vscode
+.vscode/c_cpp_properties.json
+VUMeter.code-workspace

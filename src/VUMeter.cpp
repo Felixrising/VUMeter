@@ -124,8 +124,10 @@ void loop() {
   unsigned int ptpMin = values.ptpMin; //minimum of audio sine wave
   unsigned int ptpMax = values.ptpMax; //maximum of audio sine wave
 
+#ifdef ENABLE_SERIAL_OUTPUT
   //Capture the time it takes to finish the samplesNum samples.
   unsigned long sampleFinishMillis = millis() - startMillis;
+#endif
 
  // Calculate VU Meter top LED to light on this cycle.
  unsigned int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
