@@ -1,26 +1,29 @@
-////////////////////////
-//
-//  Simple VU Meter
-//
+/*
+ * Simple VU Meter
+ * Version 1.0.0
+ * Written by https://github.com/Felixrising
+ * Date: 2023-06-24
+ * This code reads an analog signal from a microphone and displays the level on a WS2812B LED strip using the FastLED library.
+ */
+
 
 #include <Arduino.h>
 #define FASTLED_INTERNAL  // Reduce compiletime warnings with FastLED 3.5 or above.
-#include <NeoPixelBus.h>
+#include <FastLED.h>
 
 //#define ENABLE_SERIAL_OUTPUT // Optional Serial Output.
 
 #define ADC_PIN A0                // Valid range is 10bits, i.e. 0-1023
 #define NUM_PIXELS 6             // length of addressable LED strip
 #define LED_PIN D3                // LED data pin out.
-#define BRIGHTNESS 96             // Valid range 0-255
-//#define LED_TYPE   SK6812_RGBW   // LED IC model.
+#define BRIGHTNESS 64             // Valid range 0-255
+#define LED_TYPE WS2812B          //LED IC model.
 #define COLOR_ORDER GRB           // LED RGB Order.
 #define CYCLERATE 20              // 20Hz (50ms) target cycle rate.
 #define PEAKHOLDPERIOD 600        // hold Peak indicator x milliseconds before decrementing position.
 #define PEAKDECREMENTINTERVAL 50  // decrease Peak indicator position each x milliseconds, can't be less that 1/CYCLERATE and is aliased (rounding up) to next whole cycle.
 
-//CRGB leds[NUM_PIXELS];
-NeoPixelBus<NeoGrbwFeature, Neo800KbpsMethod> strip(NUM_PIXELS, LED_PIN);
+CRGB leds[NUM_PIXELS];
 
 unsigned int minValue = 1023;
 unsigned int maxValue = 0;
@@ -46,10 +49,8 @@ void setup() {
   Serial.begin(115200); 
   #endif
   // init FastLED.
-  //FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
-  //FastLED.addLeds<LED_TYPE, LED_PIN>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
-
-  //FastLED.setBrightness(BRIGHTNESS);
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
+  FastLED.setBrightness(BRIGHTNESS);
 }
 
 
@@ -96,30 +97,24 @@ void updateLEDs(unsigned int peakCount, unsigned int ledsCount) {
   // Apply updates to LEDs
   for (unsigned int j = 0; j < NUM_PIXELS; j++) {
     if (j == peakCount - 1) {
-      strip.SetPixelColor(j, RgbwColor(0, 0, 0, 255)); // make peak blue
+      leds[j] = j == 0 && peakCount == 1 ? CRGB(0, 0, 64) : CRGB(64, 0, 0);  // make peak value if - otherwise LED red
     } else if (j >= peakCount) {
-      RgbwColor color = strip.GetPixelColor(j);
-      color.Darken(128);  // reduce brightness of lit LEDs above peak by 50%
-      strip.SetPixelColor(j, color);
+      leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above peak by 128/256ths
     } else if (j < ledsCount) {
       if (j < greenTopLED) {
-        strip.SetPixelColor(j, RgbwColor(0, 255, 0, 0));  // make LEDs green
+        leds[j] = CRGB(0, 255, 0);  // make LEDs green
       } else if (j >= greenTopLED && j < yellowTopLED) {
-        strip.SetPixelColor(j, RgbwColor(255, 255, 0, 0));  // make LEDs yellow
+        leds[j] = CRGB(255, 255, 0);  // make LEDs yellow
       } else {
-        RgbwColor color = strip.GetPixelColor(j);
-        color.Darken(128);  // reduce brightness of lit LEDs below yellow by 50%
-        strip.SetPixelColor(j, color);
+        leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs below yellow by 64/256ths
       }
     } else {
-      RgbwColor color = strip.GetPixelColor(j);
-      color.Darken(128);  // reduce brightness of unlit LEDs above ledsCount by 50%
-      strip.SetPixelColor(j, color);
+      leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above ledsCount by 128/256ths
     }
   }
 
   // Show updates on the LEDs
-  strip.Show();
+  FastLED.show();
 }
 
 
@@ -140,12 +135,6 @@ void loop() {
 
  // Calculate VU Meter top LED to light on this cycle.
  unsigned int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
-  //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Alternative Logarithmic scaling calculation - human ear.
-
-// clip any spurious values from ledsCount. YUK.
-//  if (ledsCount > NUM_PIXELS) {  
-//    ledsCount = NUM_PIXELS;
-//  }
 
   // track the peak value of ledsCount for the peaking indicator.
   if (ledsCount >= peakCount) {
@@ -202,8 +191,8 @@ unsigned long cycleTime = millis() - startMillis;
 
 
   // reset min and max value for next cycle
-  minValue = 1023;
-  maxValue = 0;
+  // minValue = 1023;
+  // maxValue = 0;
 
   // Cyclerate adjustment
   // adjust number of samples to achieve CYCLERATE.
