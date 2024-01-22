@@ -4,22 +4,23 @@
 //
 
 #include <Arduino.h>
-#define FASTLED_INTERNAL  // Reduce compiletime warnings with FastLED 3.5 or above.
-#include <FastLED.h>
+//#define FASTLED_INTERNAL  // Reduce compiletime warnings with FastLED 3.5 or above.
+#include <NeoPixelBus.h>
 
 //#define ENABLE_SERIAL_OUTPUT // Optional Serial Output.
 
 #define ADC_PIN A0                // Valid range is 10bits, i.e. 0-1023
-#define NUM_PIXELS 6             // length of addressable LED strip
-#define LED_PIN D3                // LED data pin out.
-#define BRIGHTNESS 64             // Valid range 0-255
-#define LED_TYPE WS2812B          //LED IC model.
+#define NUM_PIXELS 50             // length of addressable LED strip
+#define LED_PIN 0                // LED data pin out.
+#define BRIGHTNESS 96             // Valid range 0-255
+//#define LED_TYPE   SK6812_RGBW   // LED IC model.
 #define COLOR_ORDER GRB           // LED RGB Order.
 #define CYCLERATE 20              // 20Hz (50ms) target cycle rate.
 #define PEAKHOLDPERIOD 600        // hold Peak indicator x milliseconds before decrementing position.
 #define PEAKDECREMENTINTERVAL 50  // decrease Peak indicator position each x milliseconds, can't be less that 1/CYCLERATE and is aliased (rounding up) to next whole cycle.
 
-CRGB leds[NUM_PIXELS];
+//CRGB leds[NUM_PIXELS];
+NeoPixelBus<NeoGrbwFeature, Neo800KbpsMethod> strip(NUM_PIXELS, LED_PIN);
 
 unsigned int minValue = 1023;
 unsigned int maxValue = 0;
@@ -45,8 +46,10 @@ void setup() {
   Serial.begin(115200); 
   #endif
   // init FastLED.
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(BRIGHTNESS);
+  //FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
+  //FastLED.addLeds<LED_TYPE, LED_PIN>(leds, NUM_PIXELS).setCorrection(TypicalLEDStrip);
+
+  //FastLED.setBrightness(BRIGHTNESS);
 }
 
 
@@ -93,24 +96,30 @@ void updateLEDs(unsigned int peakCount, unsigned int ledsCount) {
   // Apply updates to LEDs
   for (unsigned int j = 0; j < NUM_PIXELS; j++) {
     if (j == peakCount - 1) {
-      leds[j] = j == 0 && peakCount == 1 ? CRGB(0, 0, 64) : CRGB(64, 0, 0);  // make peak ue if - otherwise LED red
+      strip.SetPixelColor(j, RgbwColor(0, 0, 0, 255)); // make peak blue
     } else if (j >= peakCount) {
-      leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above peak by 128/256ths
+      RgbwColor color = strip.GetPixelColor(j);
+      color.Darken(128);  // reduce brightness of lit LEDs above peak by 50%
+      strip.SetPixelColor(j, color);
     } else if (j < ledsCount) {
       if (j < greenTopLED) {
-        leds[j] = CRGB(0, 255, 0);  // make LEDs green
+        strip.SetPixelColor(j, RgbwColor(0, 255, 0, 0));  // make LEDs green
       } else if (j >= greenTopLED && j < yellowTopLED) {
-        leds[j] = CRGB(255, 255, 0);  // make LEDs yellow
+        strip.SetPixelColor(j, RgbwColor(255, 255, 0, 0));  // make LEDs yellow
       } else {
-        leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs below yellow by 64/256ths
+        RgbwColor color = strip.GetPixelColor(j);
+        color.Darken(128);  // reduce brightness of lit LEDs below yellow by 50%
+        strip.SetPixelColor(j, color);
       }
     } else {
-      leds[j].fadeToBlackBy(128);  // reduce brightness of lit LEDs above ledsCount by 128/256ths
+      RgbwColor color = strip.GetPixelColor(j);
+      color.Darken(128);  // reduce brightness of unlit LEDs above ledsCount by 50%
+      strip.SetPixelColor(j, color);
     }
   }
 
   // Show updates on the LEDs
-  FastLED.show();
+  strip.Show();
 }
 
 
