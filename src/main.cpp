@@ -1,7 +1,11 @@
-////////////////////////
-//
-//  Simple VU Meter
-//
+/*
+ * Simple VU Meter
+ * Version 1.0.0
+ * Written by https://github.com/Felixrising
+ * Date: 2023-06-24
+ * This code reads an analog signal from a microphone and displays the level on a WS2812B LED strip using the FastLED library.
+ */
+
 
 #include <Arduino.h>
 //#define FASTLED_INTERNAL  // Reduce compiletime warnings with FastLED 3.5 or above.
@@ -140,12 +144,6 @@ void loop() {
 
  // Calculate VU Meter top LED to light on this cycle.
  unsigned int ledsCount = map(peakToPeak, 1, ptpMax - ptpMin, 0, NUM_PIXELS);  // Linear scaling calculation.
-  //  int ledsCount = (int)(log10(peakToPeak) / log10(ptpMax-ptpMin) * NUM_PIXELS); // Alternative Logarithmic scaling calculation - human ear.
-
-// clip any spurious values from ledsCount. YUK.
-//  if (ledsCount > NUM_PIXELS) {  
-//    ledsCount = NUM_PIXELS;
-//  }
 
   // track the peak value of ledsCount for the peaking indicator.
   if (ledsCount >= peakCount) {
@@ -202,8 +200,8 @@ unsigned long cycleTime = millis() - startMillis;
 
 
   // reset min and max value for next cycle
-  minValue = 1023;
-  maxValue = 0;
+  // minValue = 1023;
+  // maxValue = 0;
 
   // Cyclerate adjustment
   // adjust number of samples to achieve CYCLERATE.
